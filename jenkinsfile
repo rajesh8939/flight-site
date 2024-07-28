@@ -1,0 +1,48 @@
+pipeline {
+    agent any
+
+    tools {
+        maven 'Maven 3.6.3' // Ensure Maven is installed and configured in Jenkins
+        jdk 'JDK 11' // Ensure JDK is installed and configured in Jenkins
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                git branch: 'main', url: 'https://github.com/your-repo.git'
+            }
+        }
+
+        stage('Build') {
+            steps {
+                sh 'mvn clean package'
+            }
+        }
+
+        stage('Archive') {
+            steps {
+                archiveArtifacts artifacts: '**/target/*.jar', allowEmptyArchive: true
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                sshagent(credentials: ['gcp-ssh-credentials']) {
+                    sh '''
+                    scp -o StrictHostKeyChecking=no target/*.jar your-username@your-gcp-vm:/path/to/deploy
+                    ssh -o StrictHostKeyChecking=no your-username@your-gcp-vm 'bash -s' < ./deploy-script.sh
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Build, Test, and Deploy completed successfully.'
+        }
+        failure {
+            echo 'Build, Test, or Deploy failed.'
+        }
+    }
+}
